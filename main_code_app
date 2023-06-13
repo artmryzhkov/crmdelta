@@ -1,0 +1,443 @@
+firebase.initializeApp(firebaseConfig);
+ console.log(firebaseConfig);
+
+ const auth = firebase.auth();
+ const db = firebase.firestore();
+ const firestoreDb = db; 
+ const realtimeDb = firebase.database();
+
+ auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+
+ function loginUser(email, password) {
+   auth.signInWithEmailAndPassword(email, password)
+       .then((userCredential) => {
+           console.log("Пользователь вошел в систему:", userCredential.user);
+           console.log("User UID:", userCredential.user.uid);
+       })
+       .catch((error) => {
+           console.error("Ошибка входа:", error);
+           console.error("Error code:", error.code);
+           console.error("Error message:", error.message);
+       });
+}
+
+
+ auth.onAuthStateChanged(user => {
+   if (user) {
+     console.log('User signed in:', user);
+   } else {
+     console.log('Пользователь вышел');
+   }
+ });
+
+window.addEventListener('DOMContentLoaded', (event) => {
+   const loginForm = document.getElementById('login-form');
+   if (loginForm) {
+       loginForm.addEventListener('submit', (e) => {
+           e.preventDefault();
+           const email = document.getElementById('email-input').value;
+           const password = document.getElementById('password-input').value;
+           console.log('Email:', email);
+           console.log('Password:', password);
+           loginUser(email, password);
+       });
+   }
+
+   const logoutButton = document.getElementById("logout-button");
+   if (logoutButton) {
+       logoutButton.onclick = function() {
+           auth.signOut().then(() => {
+               console.log("User signed out successfully.");
+           }).catch((error) => {
+               console.error("Error signing out:", error);
+           });
+       };
+   }
+});
+function formatNumber(number, digits = 2) {
+ if (typeof number === "number") {
+   return parseFloat(number.toFixed(digits));
+ } else {
+   return number;  // если это не число, просто вернуть исходное значение
+ }
+}
+
+
+
+
+
+
+
+let combinedDataByDriver = {},
+    e = { uber: [], bolt: [], freenow: [] },
+    t = [];
+    document.addEventListener("DOMContentLoaded", function() {
+        
+function handleFileUploadAndCalculation(a) {
+    let o = a.target.getAttribute("data-service");
+    a.preventDefault();
+    let d = $(a.target),
+        i = o,
+        n = d.find('input[name="week"]').val();
+    if (!n || isNaN(n)) {
+        alert("VALID FILE OK");
+        return;
+    }
+    if (((r = parseInt(n)), !a.target.files || 0 === a.target.files.length)) return;
+    let s = a.target.files[0];
+    if (!s || !s.name.toLowerCase().endsWith(".csv")) {
+        alert("Invalid file format. Please upload a CSV file.");
+        return;
+    }
+    let l = new FileReader();
+    (l.onload = function (a) {
+        let o = a.target.result,
+            d;
+        if (i && "bolt" === i.toLowerCase()) (d = processBoltData(o, r)), mergeDriverData(i, d);
+        else if (i && "uber" === i.toLowerCase()) (d = processUberData(o, r)), mergeDriverData(i, d);
+        else if (i && "freenow" === i.toLowerCase()) (d = processFreenowData(o, r)), mergeDriverData(i, d);
+        else {
+            console.error("Unknown service:", i);
+            return;
+        }
+        (driverSummary[i] = d), mergeDriverData(i, d), displayCombinedData();
+    }),
+        l.readAsText(s);
+}
+async function readCSVFile(a) {
+    return new Promise((o, d) => {
+        let i = new FileReader();
+        (i.onload = (a) => {
+            o(a.target.result);
+        }),
+            (i.onerror = (a) => {
+                d(a);
+            }),
+            i.readAsText(a);
+    });
+}
+function getWeekNumber(d) {
+    d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay()||7));
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(),0,1));
+    const weekNo = Math.ceil(( ( (d - yearStart) / 86400000) + 1)/7);
+    return weekNo;
+}
+function updateWeekNumber() {
+    const startDate = new Date(document.getElementById('start-date').value);
+    const endDate = new Date(document.getElementById('end-date').value);
+
+    const startWeek = getWeekNumber(startDate);
+    const endWeek = getWeekNumber(endDate);
+
+    const weekValue = startWeek === endWeek ? startWeek : `${startWeek}-${endWeek}`;
+    const formattedStartDate = startDate.toISOString().split('T')[0];
+    const formattedEndDate = endDate.toISOString().split('T')[0];
+
+    document.getElementById('week').value = `${weekValue}-${formattedStartDate}-${formattedEndDate}`;
+}
+
+function processAllFiles(a, o, d, i) {
+    let n = processUberData(a, i),
+        s = processBoltData(o, i),
+        l = processFreenowData(d, i);
+    Object.assign(combinedDataByDriver, n, s, l), displayCombinedData();
+}
+function processData(a, o, d, i, n, s) {
+    let l = Papa.parse(o, { header: !0, skipEmptyLines: !0 });
+    console.log("Parsed CSV data:", l);
+    let p = {};
+    for (let u of l.data) {
+        if (s && !s(u)) continue;
+        let y = "function" == typeof i ? i(u) : u[i];
+        if (!y) break;
+        let c = capitalizeWords(y);
+        p[c] || (p[c] = { driver_id: c, week: n, kursy: 0, przychod_dodatkowy: 0, commission: 0, gotowka: 0, tips: 0, vat_przejazdy: 0, vat_dodatkowy: 0, vat_bonus: 0, partner: 0, zus: 0, wynajem: 0, total: 0 }), d(p[c], u);
+    }
+    return console.log("Processed driver data:", p), Object.values(p);
+}
+function processUberData(a, o) {
+    return processData("uber", a, updateUberDriverData, (a) => `${a["Imię kierowcy"]} ${a["Nazwisko kierowcy"]}`, o);
+}
+function processFreenowData(a, o) {
+    return processData("freenow", a, updateFreenowDriverData, "Driver", o);
+}
+function processBoltData(a, o) {
+    return processData("bolt", a, updateBoltDriverData, "Kierowca", o, (a) => Object.values(a).some((a) => "Wszyscy kierowcy" !== a));
+}
+function capitalizeWords(a) {
+    return a
+        .toLowerCase()
+        .split(" ")
+        .map((a) => a.charAt(0).toUpperCase() + a.slice(1))
+        .join(" ");
+}
+function updateBoltDriverData(a, o) {
+    console.log("Update Bolt driver data:", o),
+        (a.kursy += parseFloatOrDefault(o["Wartość brutto"])),
+        (a.przychod_dodatkowy +=
+            parseFloatOrDefault(o["Przych\xf3d dodatkowy"]) +
+            parseFloatOrDefault(o["Opłata za anulowanie"]) +
+            parseFloatOrDefault(o["Opłata rezerwacyjna (płatność)"]) +
+            parseFloatOrDefault(o["Opłata rezerwacyjna (potrącenie)"]) +
+            parseFloatOrDefault(o["Opłata drogowa"]) +
+            parseFloatOrDefault(o["Zniżki got\xf3wkowe zrekompensowane przez Bolt"]) +
+            parseFloatOrDefault(o.Bonus)),
+        (a.commission += parseFloatOrDefault(o["Opłata Bolt"])),
+        (a.gotowka += parseFloatOrDefault(o["Przejazdy got\xf3wkowe (przyjęta got\xf3wka)"])),
+        (a.tips += parseFloatOrDefault(o.Napiwek)),
+        (a.vat_przejazdy = -(0.03 * a.kursy)),
+        (a.vat_dodatkowy = -(0.23 * a.przychod_dodatkowy)),
+        (a.vat_bonus += parseFloatOrDefault(o["VAT bonus"])),
+        (a.zus += parseFloatOrDefault(o.ZUS)),
+        (a.wynajem += parseFloatOrDefault(o.Wynajem)),
+        (a.total = a.kursy + a.przychod_dodatkowy + a.commission + a.gotowka + a.tips + a.vat_przejazdy + a.vat_dodatkowy + a.vat_bonus + a.partner + a.zus + a.wynajem),
+        mergeDriverData("bolt", [a]),
+        saveCombinedDataToFirebase(),
+        saveDataToFirebase(a.driver_id, a.week, "bolt", a);
+}
+function updateUberDriverData(a, o) {
+    console.log("Update Uber driver data:", o),
+        (a.kursy += parseFloatOrDefault(o["Wypłacono Ci:Tw\xf3j przych\xf3d:Opłata:Opłata"])),
+        (a.przychod_dodatkowy +=
+            parseFloatOrDefault(o["Przych\xf3d dodatkowy"]) +
+            parseFloatOrDefault(o["Wypłacono Ci:Tw\xf3j przych\xf3d:Opłata:Mnożnik"]) +
+            parseFloatOrDefault(o["Wypłacono Ci:Tw\xf3j przych\xf3d:Opłata:Czas oczekiwania w miejscu odbioru"]) +
+            parseFloatOrDefault(o["Wypłacono Ci:Tw\xf3j przych\xf3d:Promocja:Program Quest"]) +
+            parseFloatOrDefault(o["Wypłacono Ci:Tw\xf3j przych\xf3d:Opłata:Odwołanie"])),
+        (a.commission += parseFloatOrDefault(o["Wypłacono Ci:Tw\xf3j przych\xf3d:Opłata za usługę"]) + parseFloatOrDefault(o["Wypłacono Ci:Tw\xf3j przych\xf3d:Podatki:Podatek od opłaty za usługę"])),
+        (a.gotowka += parseFloatOrDefault(o["Wypłacono Ci : Bilans przejazdu : Wypłaty : Odebrana got\xf3wka"])),
+        (a.tips += parseFloatOrDefault(o["Wypłacono Ci:Tw\xf3j przych\xf3d:Napiwek"])),
+        (a.vat_przejazdy = -(0.08 * a.kursy)),
+        (a.vat_dodatkowy = -(0.08 * a.przychod_dodatkowy)),
+        (a.vat_bonus += parseFloatOrDefault(o["VAT bonus"])),
+        (a.zus += parseFloatOrDefault(o.ZUS)),
+        (a.wynajem += parseFloatOrDefault(o.Wynajem)),
+        (a.total = a.kursy + a.przychod_dodatkowy + a.commission + a.gotowka + a.tips + a.vat_przejazdy + a.vat_dodatkowy + a.vat_bonus + a.partner + a.zus + a.wynajem),
+        mergeDriverData("uber", [a]),
+        saveCombinedDataToFirebase(),
+        saveDataToFirebase(a.driver_id, a.week, "uber", a);
+}
+function updateFreenowDriverData(a, o) {
+    console.log("Update Freenow driver data:", o),
+        (a.kursy += parseFloatOrDefault(o["Completed trips "])),
+        (a.przychod_dodatkowy +=
+            parseFloatOrDefault(o["Additional Income"]) + parseFloatOrDefault(o.Incentives) + parseFloatOrDefault(o.Tolls) + parseFloatOrDefault(o.Cancellations) + parseFloatOrDefault(o["Waiting time"]) + parseFloatOrDefault(o.Others)),
+        (a.commission += parseFloatOrDefault(o.Commission)),
+        (a.gotowka += parseFloatOrDefault(o["Non-app payments"])),
+        (a.tips += parseFloatOrDefault(o.Tips)),
+        (a.vat_przejazdy = -(0.08 * a.kursy)),
+        (a.vat_dodatkowy = -(0.23 * a.przychod_dodatkowy)),
+        (a.vat_bonus += parseFloatOrDefault(o["VAT Bonus"])),
+        (a.zus += parseFloatOrDefault(o.ZUS)),
+        (a.wynajem += parseFloatOrDefault(o.Rent)),
+        (a.total = a.kursy + a.przychod_dodatkowy - a.commission - a.gotowka + a.tips + a.vat_przejazdy + a.vat_dodatkowy + a.vat_bonus + a.partner + a.zus + a.wynajem),
+        mergeDriverData("freenow", [a]),
+        saveCombinedDataToFirebase(),
+        saveDataToFirebase(a.driver_id, a.week, "freenow", a);
+}
+function parseFloatOrDefault(a, o = 0) {
+    return parseFloat(a) || o;
+}
+function calculateDriverData(a, o) {
+    return (a.vat_przejazdy = 0.08 * a.kursy), (a.vat_dodatkowy = 0.08 * a.przychod_dodatkowy), a;
+}
+function mergeDriverData(a, o) {
+    o.forEach((o) => {
+        let d = o.driver_id;
+        combinedDataByDriver[d]
+            ? (combinedDataByDriver[d].service || (combinedDataByDriver[d].service = []),
+              combinedDataByDriver[d].service.includes(a) || combinedDataByDriver[d].service.push(a),
+              Object.keys(o).forEach((a) => {
+                  -1 === ["driver_id", "week", "service"].indexOf(a) && (combinedDataByDriver[d][a] += o[a]);
+              }))
+            : ((combinedDataByDriver[d] = { driver_id: d, week: o.week, service: [a], ...o }),
+              (combinedDataByDriver[d].kursy = o.kursy),
+              (combinedDataByDriver[d].przychod_dodatkowy = o.przychod_dodatkowy),
+              (combinedDataByDriver[d].commission = o.commission),
+              (combinedDataByDriver[d].gotowka = o.gotowka),
+              (combinedDataByDriver[d].tips = o.tips),
+              (combinedDataByDriver[d].vat_przejazdy = o.vat_przejazdy),
+              (combinedDataByDriver[d].vat_dodatkowy = o.vat_dodatkowy),
+              (combinedDataByDriver[d].vat_bonus = o.vat_bonus),
+              (combinedDataByDriver[d].partner = o.kursy > 10 ? (a.partner = -50) : (o.partner = 0)),
+              (combinedDataByDriver[d].zus = o.zus),
+              (combinedDataByDriver[d].wynajem = o.wynajem),
+              (combinedDataByDriver[d].total = o.total));
+
+        // Запросить все записи ZUS для этого водителя
+        realtimeDb.ref(`drivers/${d}/zus`).once('value').then(snapshot => {
+            const zusEntries = snapshot.val();
+            if (!zusEntries) {
+        console.log(`No ZUS entries found for driver ${d}`);
+        return;
+    }
+
+    console.log(`ZUS entries for driver ${d}:`, zusEntries);
+
+            for (const zusId in zusEntries) {
+                const zusEntry = zusEntries[zusId];
+
+                // Проверить, соответствует ли дата записи ZUS выбранной неделе
+                const zusDate = new Date(zusEntry.paymentDate);
+                const zusWeek = getWeekNumber(zusDate);
+
+                if (zusWeek === o.week) {
+                    // Добавить данные ZUS к общим данным водителя
+                    if (isNaN(parseFloat(zusEntry.contributionAmount))) {
+    console.error(`Invalid contributionAmount for driver ${d}: ${zusEntry.contributionAmount}`);
+} else {
+    combinedDataByDriver[d].zus += parseFloat(zusEntry.contributionAmount);
+}
+
+                    combinedDataByDriver[d].zus += parseFloat(zusEntry.contributionAmount);
+                }
+            }
+        }).catch(error => {
+    console.error('Error reading ZUS data:', error);
+        });
+
+        // Запросить все записи счетов-фактур для этого водителя
+        realtimeDb.ref(`drivers/${d}/invoices`).once('value').then(snapshot => {
+    
+            const invoiceEntries = snapshot.val();
+
+            if (!invoiceEntries) {
+        console.log(`No invoice entries found for driver ${d}`);
+        return;
+    }
+
+    console.log(`Invoice entries for driver ${d}:`, invoiceEntries); 
+
+            for (const invoiceId in invoiceEntries) {
+                const invoiceEntry = invoiceEntries[invoiceId];
+
+                // Проверить, соответствует ли дата счета-фактуры выбранной неделе и имеет ли статус "zatwierdzony"
+                const invoiceDate = new Date(invoiceEntry.purchaseDate);
+                const invoiceWeek = getWeekNumber(invoiceDate);
+
+                if (invoiceWeek === o.week && invoiceEntry.status === 'zatwierdzony') {
+                    // Добавить данные счета-фактуры к общим данным водителя
+                    combinedDataByDriver[d].vat_bonus += parseFloat(invoiceEntry.vatReturn);
+                }
+            }
+        }).catch(error => {
+    console.error('Error reading invoice data:', error);
+
+        });
+    });
+}
+function displayCombinedData() {
+    let a = $("#combined-results"),
+        o = a.find("tbody");
+    o.empty(),
+        Object.values(combinedDataByDriver).forEach((a) => {
+            let d = $("<tr>");
+            d.append(`<td>${a.driver_id}</td>`),
+                d.append(`<td>${a.week}</td>`),
+                d.append(`<td>${a.service.join(", ").toUpperCase()}</td>`),
+                d.append(`<td>${a.kursy.toFixed(2)}</td>`),
+                d.append(`<td>${a.przychod_dodatkowy.toFixed(2)}</td>`),
+                d.append(`<td>${a.commission.toFixed(2)}</td>`),
+                d.append(`<td>${a.gotowka.toFixed(2)}</td>`),
+                d.append(`<td>${a.tips.toFixed(2)}</td>`),
+                d.append(`<td>${a.vat_przejazdy.toFixed(2)}</td>`),
+                d.append(`<td>${a.vat_dodatkowy.toFixed(2)}</td>`),
+                d.append(`<td>${a.vat_bonus.toFixed(2)}</td>`),
+                a.kursy > 10 ? (a.partner = -50) : (a.partner = 0),
+                d.append(`<td>${a.partner.toFixed(2)}</td>`),
+                d.append(`<td>${a.zus.toFixed(2)}</td>`),
+                d.append(`<td>${a.wynajem.toFixed(2)}</td>`),
+                d.append(`<td>${a.total.toFixed(2)}</td>`),
+                o.append(d);
+        }),
+        a.removeClass("d-none"),
+        saveCombinedDataToFirebase();
+}
+function saveCombinedDataToFirebase() {
+    Object.values(combinedDataByDriver).forEach((a) => {
+        let o = a.driver_id,
+            d = a.week,
+            i = {
+                kursy: a.kursy,
+                przychod_dodatkowy: a.przychod_dodatkowy,
+                commission: a.commission,
+                gotowka: a.gotowka,
+                tips: a.tips,
+                vat_przejazdy: a.vat_przejazdy,
+                vat_dodatkowy: a.vat_dodatkowy,
+                vat_bonus: a.vat_bonus,
+                partner: a.partner,
+                zus: a.zus,
+                wynajem: a.wynajem,
+                total: a.total + a.partner,
+                service: a.service,
+            };
+        realtimeDb.ref(`drivers/${o}/weeks/${d}/summary`).update(i);
+    });
+}
+
+function saveDataToFirebase(a, o, d, i) {
+
+    const startDate = document.getElementById('start-date').value;
+    const endDate = document.getElementById('end-date').value;
+
+    const dataToSave = {
+        startDate,
+        endDate
+    };
+    realtimeDb.ref(`drivers/${a}/weeks/${o}/apps/${d}/`).update(i);
+}
+(drivers = {}),
+    (dataAdded = !1),
+    document.getElementById("uber-file").addEventListener("change", handleFileUploadAndCalculation),
+    document.getElementById("bolt-file").addEventListener("change", handleFileUploadAndCalculation),
+    document.getElementById("freenow-file").addEventListener("change", handleFileUploadAndCalculation),
+    document.getElementById("upload-form").addEventListener("submit", async (a) => {
+        a.preventDefault();
+        let o = document.getElementById("week").value;
+        if (!o) {
+            alert("Please enter a week number");
+            return;
+        }
+        let d = document.getElementById("uber-file"),
+            i = document.getElementById("bolt-file"),
+            n = document.getElementById("freenow-file"),
+            s = { uber: d.files[0], bolt: i.files[0], freenow: n.files[0] };
+        for (let [l, p] of Object.entries(s))
+            if (!p || !p.name.toLowerCase().endsWith(".csv")) {
+                alert(`Invalid file format for ${l}. Please upload a CSV file.`);
+                return;
+            }
+        let u = {};
+        for (let [y, c] of Object.entries(s)) u[y] = await readCSVFile(c);
+        processAllFiles(u.uber, u.bolt, u.freenow, o);
+    }),
+    $(document).ready(function () {
+        $("form").on("submit", handleFileUploadAndCalculation);
+    });
+});
+</script>
+
+
+<script>
+document.getElementById('start-date').addEventListener('change', updateWeekNumber);
+document.getElementById('end-date').addEventListener('change', updateWeekNumber);
+
+function updateWeekNumber() {
+    const startDate = new Date(document.getElementById('start-date').value);
+    const endDate = new Date(document.getElementById('end-date').value);
+
+    const startWeek = getWeekNumber(startDate);
+    const endWeek = getWeekNumber(endDate);
+
+    document.getElementById('week').value = startWeek === endWeek ? startWeek : `${startWeek}-${endWeek}`;
+}
+
+function getWeekNumber(d) {
+    d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay()||7));
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(),0,1));
+    const weekNo = Math.ceil(( ( (d - yearStart) / 86400000) + 1)/7);
+    return weekNo;
+}
